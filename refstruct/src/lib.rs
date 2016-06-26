@@ -1,8 +1,15 @@
 extern crate toml;
 
+/// The refstruct macro. Use like this:
+///
+/// ```ignore
+/// include!(refstruct!(r#"
+/// // TOML content
+/// "#);
+/// ```
 #[macro_export]
 macro_rules! refstruct {
-    ($e: tt) => { concat!(env!("OUT_DIR"), "/ref_struct/", file!(), "/", line!()) };
+    ($e: tt) => { concat!(env!("OUT_DIR"), "/refstruct/", file!(), "/", line!()) };
 }
 
 use std::path::{Path, PathBuf};
@@ -15,7 +22,7 @@ impl Scanner {
         let mut in_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         in_dir.push("src");
         let mut out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-        out_dir.push("ref_struct");
+        out_dir.push("refstruct");
         out_dir.push("src");
         Scanner::process_dir(&in_dir, &out_dir, true)
     }
@@ -51,7 +58,7 @@ impl Scanner {
 
             let l = try!(line);
             if startline.is_none() {
-                if l.find("ref_struct!").is_some() { startline = Some(lineno+1) };
+                if l.find("refstruct!").is_some() { startline = Some(lineno+1) };
                 continue;
             }
 

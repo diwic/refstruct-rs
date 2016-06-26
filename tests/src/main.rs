@@ -1,7 +1,7 @@
 #[macro_use]
-extern crate refbuilder;
+extern crate refstruct;
 
-include!(ref_struct!(r#"
+include!(refstruct!(r#"
 name = "FooFinder"
 fields = [
    ["data", "String"],

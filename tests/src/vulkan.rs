@@ -17,7 +17,7 @@ impl<'a> CommandBuffer<'a> {
     pub fn new(_program: &'a Program) -> CommandBuffer<'a> { CommandBuffer(23, PhantomData) }
 }
 
-include!(ref_struct!(r#"
+include!(refstruct!(r#"
 name = "Vulkan"
 use = ["super::{Program, CommandBuffer}"]
 fields = [

@@ -1,5 +1,5 @@
 [package]
-name = "refbuilder"
+name = "refstruct"
 version = "0.1.0"
 authors = ["David Henningsson <diwic@ubuntu.com>"]
 

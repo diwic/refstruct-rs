@@ -1,3 +1,5 @@
-extern crate refbuilder;
+extern crate refstruct;
 
-fn main() { refbuilder::Scanner::process_src().unwrap(); }
+fn main() {
+   refstruct::Scanner::process_src().unwrap();
+}

@@ -1,11 +1,11 @@
 [package]
-name = "tester"
+name = "tests"
 version = "0.1.0"
 authors = ["David Henningsson <diwic@ubuntu.com>"]
 build = "build.rs"
 
 [dependencies]
-refbuilder = { path = "../refbuilder/" }
+refstruct = { path = "../refstruct/" }
 
 [build-dependencies]
-refbuilder = { path = "../refbuilder/" }
+refstruct = { path = "../refstruct/" }
