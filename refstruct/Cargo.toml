@@ -1,0 +1,7 @@
+[package]
+name = "refbuilder"
+version = "0.1.0"
+authors = ["David Henningsson <diwic@ubuntu.com>"]
+
+[dependencies]
+toml = "0.1"
