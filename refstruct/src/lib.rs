@@ -93,6 +93,7 @@ pub struct StructWriter {
     name: String,
     module: String,
     lt: String,
+    sprefix: String,
     imports: Vec<String>,
     fields: Vec<(String, String)>,
 }
@@ -101,10 +102,25 @@ impl StructWriter {
     pub fn from_toml(input: &str) -> Result<StructWriter, String> {
         let mut toml_parser = toml::Parser::new(input);
         let v = try!(toml_parser.parse().ok_or_else(|| format!("is not valid TOML: {:?}", toml_parser.errors)));
-        // panic!("{:?}", v);
+
         let name = try!(v.get("name").and_then(|v| v.as_str()).ok_or(" - missing or invalid 'name' key"));
-        let module = v.get("module").and_then(|v| v.as_str()).map(|s| s.into()).unwrap_or_else(|| name.to_lowercase());
-        let lt = format!("'{}", module);
+        if name == "" { return Err(" - name cannot be empty".into()) }
+
+        let namespace = (if let Some(ns) = v.get("namespace") {
+            try!(ns.as_str().ok_or(" - namespace is not a string"))
+        } else { &*name }).to_lowercase();
+        if namespace == "" { return Err(" - name cannot be empty".into()) }
+
+        let sprefix = format!("{}{}", namespace.to_uppercase().chars().next().unwrap(),
+            namespace.chars().skip(1).collect::<String>());
+
+        let module = (if let Some(ns) = v.get("module") {
+            try!(ns.as_str().ok_or(" - module is not a string"))
+        } else { &*namespace }).to_string();
+
+        let lt = format!("'{}", if let Some(ns) = v.get("lifetime") {
+            try!(ns.as_str().ok_or(" - lifetime is not a string"))
+        } else { &*namespace });
 
         let imports = v.get("use").and_then(|v| v.as_slice()).unwrap_or(&[]);
         let imports: Vec<String> = imports.iter().filter_map(|s| s.as_str()).map(|s| String::from(s)).collect();
@@ -115,21 +131,14 @@ impl StructWriter {
             let f = try!(f.as_slice().ok_or(" - all fields are not arrays"));
             let k = try!(f.get(0).and_then(|k| k.as_str()).ok_or(" - field subarray must be two strings"));
             let v = try!(f.get(1).and_then(|k| k.as_str()).ok_or(" - field subarray must be two strings"));
+            if k == "new" || k == "build" { return Err(" - fields cannot be named 'new' or 'build'".into()) }
             fields.push((k.into(), v.into()));
-            // let ty = try!(ty.as_str().ok_or_else(|| format!(" - field '{}' has invalid type", key)));
-            // fields.push((key.clone(), ty.into()));
         }
 
-        Ok(StructWriter { name: name.into(), module: module, fields: fields, lt: lt, imports: imports })
+        Ok(StructWriter { name: name.into(), module: module, fields: fields, lt: lt,
+            sprefix: sprefix, imports: imports })
     }
-/*
-    fn write_getter(&self, k: &str, v: &str, outside_mod: bool) -> String {
-        let indent = if outside_mod { "    " } else { "        " };
-        let modprefix = if outside_mod { format!("{}::", self.module) } else { String::new() };
-        format!("{}#[allow(dead_code)]\n{}pub fn {}<{}>(&{} self) -> &{} {} {{ unsafe {{ {}Ptr::{}(&self.0) }} }}\n",
-            indent, indent, k, self.lt, self.lt, self.lt, v.replace("'_", &self.lt), modprefix, k)
-    }
-*/
+
     fn write_ptr(&self, ptr_ty: &str, mutstr: &str, ptrstr: &str) -> String {
         let mut s = format!(r#"
     struct {} {{}}
@@ -137,37 +146,38 @@ impl StructWriter {
         for &(ref k, ref v) in &self.fields {
             s.push_str(&format!(r#"
         unsafe fn {}<{}>(a: & {} {} Box<[u8]>) -> & {} {} {} {{
-            debug_assert_eq!(::std::mem::size_of::<Raw<'static>>(), a.len());
-            &{} (&{} *(&{} a[0] as *{} _ as *{} Raw<{}>)).{}
+            debug_assert_eq!(::std::mem::size_of::<{}Raw<'static>>(), a.len());
+            &{} (&{} *(&{} a[0] as *{} _ as *{} {}Raw<{}>)).{}
         }}
 "#,
                 k, self.lt, self.lt, mutstr, self.lt, mutstr, v.replace("'_", &self.lt),
-                mutstr, mutstr, mutstr, ptrstr, ptrstr, self.lt, k));
+                self.sprefix, mutstr, mutstr, mutstr, ptrstr, ptrstr, self.sprefix, self.lt, k));
         }
         s.push_str("    }\n");
         s
     }
 
 
-    fn write_ptrwrite(container: &str, k: &str, consume: &str) -> String {
-        format!("unsafe {{ ::std::ptr::write(Ptr::{}(& {}) as *const _ as *mut _, {}) }}",
-            k, container, consume) 
+    fn write_ptrwrite(&self, container: &str, k: &str, consume: &str) -> String {
+        format!("unsafe {{ ::std::ptr::write({}Ptr::{}(& {}) as *const _ as *mut _, {}) }}",
+            self.sprefix, k, container, consume) 
     }
 
     fn write_step(&self, step: usize) -> String {
+        let stepstr = format!("{}Step{}", self.sprefix, step);
         let mut s = format!(r#"
     #[derive(Debug)]
-    pub struct Step{}(Box<[u8]>);
-    impl Step{} {{"#, step, step);
+    pub struct {}(Box<[u8]>);
+    impl {} {{"#, stepstr, stepstr);
 
         // First init
         if step == 1 { s.push_str(&format!(r#"
-        pub fn new(p: {}) -> Step1 {{
-            let v = vec!(0; ::std::mem::size_of::<Raw<'static>>());
+        pub fn new(p: {}) -> {} {{
+            let v = vec!(0; ::std::mem::size_of::<{}Raw<'static>>());
             let r = v.into_boxed_slice();
             {};
-            Step1(r)
-        }}"#, self.fields[0].1, Self::write_ptrwrite("r", &self.fields[0].0, "p")));
+            {}(r)
+        }}"#, self.fields[0].1, stepstr, self.sprefix, self.write_ptrwrite("r", &self.fields[0].0, "p"), stepstr));
         }
 
         // Final build
@@ -180,7 +190,7 @@ impl StructWriter {
         if step < self.fields.len() {
             let (ref k, ref v) = self.fields[step];
             s.push_str(&format!(r#"
-        pub fn {}<F>(mut self, f: F) -> Step{}
+        pub fn {}<F>(mut self, f: F) -> {}Step{}
             where F: for<{}> FnOnce(&{} Self) -> {}
         {{
             {{
@@ -189,44 +199,45 @@ impl StructWriter {
             }}
             let b = ::std::mem::replace(&mut self.0, Box::new([]));
             ::std::mem::forget(self);
-            Step{}(b)
-        }}"#, k, step+1, self.lt, self.lt, v.replace("'_", &self.lt),
-            Self::write_ptrwrite("self.0", k, "r"), step+1));
+            {}Step{}(b)
+        }}"#, k, self.sprefix, step+1, self.lt, self.lt, v.replace("'_", &self.lt),
+            self.write_ptrwrite("self.0", k, "r"), self.sprefix, step+1));
         }
 
         // Getters
         for &(ref k, ref v) in self.fields.iter().take(step) {
             s.push_str(&format!(r#"
         pub fn {}<{}>(&{} self) -> &{} {} {{
-            unsafe {{ Ptr::{}(&self.0) }}
-        }}"#, k, self.lt, self.lt, self.lt, v.replace("'_", &self.lt), k))
+            unsafe {{ {}Ptr::{}(&self.0) }}
+        }}"#, k, self.lt, self.lt, self.lt, v.replace("'_", &self.lt), self.sprefix, k))
         }
 
         s.push_str("\n    }\n");
 
         // Drop
         s.push_str(&format!(r#"
-    impl Drop for Step{} {{
+    impl Drop for {} {{
         fn drop(&mut self) {{
-            let _ = unsafe {{ ::std::ptr::read(Ptr::{}(&self.0)) }};{}
+            let _ = unsafe {{ ::std::ptr::read({}Ptr::{}(&self.0)) }};{}
         }}
-    }}"#, step, self.fields[step-1].0, if step > 1 {
+    }}"#, stepstr, self.sprefix, self.fields[step-1].0, if step > 1 {
             format!(r#"
-            let _ = Step{}(::std::mem::replace(&mut self.0, Box::new([])));"#, step-1) } else { "".into() } 
+            let _ = {}Step{}(::std::mem::replace(&mut self.0, Box::new([])));"#, self.sprefix, step-1) } else { "".into() } 
         ));
 
         s
     }
 
     fn write_outer(&self) -> String {
+        let stepstr = format!("{}::{}Step", self.module, self.sprefix);
         let mut s = format!(r#"
 #[derive(Debug)]
-pub struct {}({}::Step{});
+pub struct {}({}{});
 impl {} {{
     #[allow(dead_code)]
     #[inline]
-    pub fn new(a: {}) -> {}::Step1 {{ {}::Step1::new(a) }}"#,
-            self.name, self.module, self.fields.len(), self.name, self.fields[0].1, self.module, self.module);
+    pub fn new(a: {}) -> {}1 {{ {}1::new(a) }}"#,
+            self.name, stepstr, self.fields.len(), self.name, self.fields[0].1, stepstr, stepstr);
         for &(ref k, ref v) in &self.fields {
             s.push_str(&format!(r#"
 
@@ -251,14 +262,14 @@ impl {} {{
 
         // Write raw repr struct
         s.push_str("\n");
-        s.push_str(&format!("    struct Raw<{}> {{\n", self.lt));
+        s.push_str(&format!("    struct {}Raw<{}> {{\n", self.sprefix, self.lt));
         for &(ref k, ref v) in &self.fields {
             s.push_str(&format!("        {}: {},\n", k, v.replace("'_", &self.lt)));
         }
         s.push_str("    }\n");
 
         // Write ptrs
-        s.push_str(&self.write_ptr("Ptr", "", "const"));
+        s.push_str(&self.write_ptr(&format!("{}Ptr", self.sprefix), "", "const"));
         // s.push_str(&self.write_ptr("PtrMut", "mut", "mut"));
 
         // Write all steps
