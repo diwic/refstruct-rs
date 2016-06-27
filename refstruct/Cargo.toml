@@ -3,5 +3,11 @@ name = "refstruct"
 version = "0.1.0"
 authors = ["David Henningsson <diwic@ubuntu.com>"]
 
+description = "Generates a struct which can rerefence its own fields. Currently alpha/experimental."
+repository = "https://github.com/diwic/refstruct-rs"
+documentation = "https://github.com/diwic/refstruct-rs/blob/master/README.md"
+keywords = ["struct", "self", "reference"]
+license = "Apache-2.0/MIT"
+
 [dependencies]
 toml = "0.1"

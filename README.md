@@ -5,7 +5,7 @@ Current state: Alpha / experimental.
 
 This file is currently the only documentation.
 
-Background:
+Background
 -----------
 
 Say that you have a String, some slices of that string and then you want to store both the String and the slices in the same struct:
@@ -17,19 +17,22 @@ pub struct Foo {
 }
 ```
 
-You have a few options but all have their drawbacks:
+The code above does not compile, because you cannot specify a valid lifetime for the `&str`. You have a few options but all have their drawbacks:
+
  * store index and length instead of &str - this works for very simple examples such as the above, but does not scale (e g, if there are many different owner Strings, things grow increasingly complex). It also does not work for a lot of other scenarios where the relationship between owner and borrowed pointer is less obvious.
  * go unsafe - this is bad because it is unsafe.
  * [self-borrowing for life](https://www.rust-lang.org/faq.html#how-can-i-define-a-struct-that-contains-a-reference-to-one-of-its-own-fields) - makes the struct permanently borrowed by itself, so you never modify it again.
  * use Rc/Arc together with [owning_ref](https://crates.io/crates/owning_ref) - can cause some overhead, as well as risk for memory leaks via Rc cycles.
 
-The idea:
----------
+For a more thorough read on the topic, see [Tomaka's essay](https://gist.github.com/tomaka/da8c374ce407e27d5dac).
+
+The idea
+--------
 
 A complex self-referencing struct is likely to be built once and then used often, but not mutated. It is created in a specific field order, and destroyed in the reverse field order. A field can contain references to fields created earlier, but not later. Also, the struct is always on the heap to ensure it is never moved in memory.
 
 So, this crate generates some code that is a safe abstraction around this idea.
-The code is generated through a build.rs script because of current Rust macro [limitations](https://github.com/rust-lang/rust/issues/34303).
+The code is generated through a build.rs script because Rust macros have [limitations](https://github.com/rust-lang/rust/issues/34303), and compiler plugins don't run on stable Rust.
 
 Getting started
 ==============
