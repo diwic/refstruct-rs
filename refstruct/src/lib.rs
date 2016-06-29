@@ -157,10 +157,9 @@ impl StructWriter {
         s
     }
 
-
     fn write_ptrwrite(&self, container: &str, k: &str, consume: &str) -> String {
-        format!("unsafe {{ ::std::ptr::write({}Ptr::{}(& {}) as *const _ as *mut _, {}) }}",
-            self.sprefix, k, container, consume) 
+        format!("unsafe {{ ::std::ptr::write(&mut (&mut *(&mut {}[0] as *mut _ as *mut {}Raw<'static>)).{}, {}) }}",
+            container, self.sprefix, k, consume) 
     }
 
     fn write_step(&self, step: usize) -> String {
@@ -174,7 +173,7 @@ impl StructWriter {
         if step == 1 { s.push_str(&format!(r#"
         pub fn new(p: {}) -> {} {{
             let v = vec!(0; ::std::mem::size_of::<{}Raw<'static>>());
-            let r = v.into_boxed_slice();
+            let mut r = v.into_boxed_slice();
             {};
             {}(r, ::std::marker::PhantomData)
         }}"#, self.fields[0].1, stepstr, self.sprefix, self.write_ptrwrite("r", &self.fields[0].0, "p"), stepstr));
@@ -193,15 +192,13 @@ impl StructWriter {
         pub fn {}<F>(mut self, f: F) -> {}Step{}
             where F: for<{}> FnOnce(&{} Self) -> {}
         {{
-            {{
-                let r = f(&self);
-                {};
-            }}
-            let b = ::std::mem::replace(&mut self.0, Box::new([]));
+            let r: {} = unsafe {{ ::std::mem::transmute(f(&self)) }};
+            let mut b = ::std::mem::replace(&mut self.0, Box::new([]));
             ::std::mem::forget(self);
+            {};
             {}Step{}(b, ::std::marker::PhantomData)
         }}"#, k, self.sprefix, step+1, self.lt, self.lt, v.replace("'_", &self.lt),
-            self.write_ptrwrite("self.0", k, "r"), self.sprefix, step+1));
+            v.replace("'_", "'static"), self.write_ptrwrite("b", k, "r"), self.sprefix, step+1));
         }
 
         // Getters
