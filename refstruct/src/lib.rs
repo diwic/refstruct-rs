@@ -235,8 +235,9 @@ pub struct {}({}{});
 impl {} {{
     #[allow(dead_code)]
     #[inline]
-    pub fn new(a: {}) -> {}1 {{ {}1::new(a) }}"#,
-            self.name, stepstr, self.fields.len(), self.name, self.fields[0].1, stepstr, stepstr);
+    pub fn new({}: {}) -> {}1 {{ {}1::new({}) }}"#,
+            self.name, stepstr, self.fields.len(), self.name, self.fields[0].0, self.fields[0].1,
+            stepstr, stepstr, self.fields[0].0);
         for &(ref k, ref v) in &self.fields {
             s.push_str(&format!(r#"
 
