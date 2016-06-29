@@ -167,8 +167,8 @@ impl StructWriter {
         let stepstr = format!("{}Step{}", self.sprefix, step);
         let mut s = format!(r#"
     #[derive(Debug)]
-    pub struct {}(Box<[u8]>);
-    impl {} {{"#, stepstr, stepstr);
+    pub struct {}(Box<[u8]>, ::std::marker::PhantomData<{}Raw<'static>>);
+    impl {} {{"#, stepstr, self.sprefix, stepstr);
 
         // First init
         if step == 1 { s.push_str(&format!(r#"
@@ -176,7 +176,7 @@ impl StructWriter {
             let v = vec!(0; ::std::mem::size_of::<{}Raw<'static>>());
             let r = v.into_boxed_slice();
             {};
-            {}(r)
+            {}(r, ::std::marker::PhantomData)
         }}"#, self.fields[0].1, stepstr, self.sprefix, self.write_ptrwrite("r", &self.fields[0].0, "p"), stepstr));
         }
 
@@ -199,7 +199,7 @@ impl StructWriter {
             }}
             let b = ::std::mem::replace(&mut self.0, Box::new([]));
             ::std::mem::forget(self);
-            {}Step{}(b)
+            {}Step{}(b, ::std::marker::PhantomData)
         }}"#, k, self.sprefix, step+1, self.lt, self.lt, v.replace("'_", &self.lt),
             self.write_ptrwrite("self.0", k, "r"), self.sprefix, step+1));
         }
@@ -222,7 +222,9 @@ impl StructWriter {
         }}
     }}"#, stepstr, self.sprefix, self.fields[step-1].0, if step > 1 {
             format!(r#"
-            let _ = {}Step{}(::std::mem::replace(&mut self.0, Box::new([])));"#, self.sprefix, step-1) } else { "".into() } 
+            let _ = {}Step{}(::std::mem::replace(&mut self.0, Box::new([])), ::std::marker::PhantomData);"#,
+                self.sprefix, step-1)
+            } else { "".into() } 
         ));
 
         s
