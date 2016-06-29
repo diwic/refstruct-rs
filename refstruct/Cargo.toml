@@ -1,9 +1,9 @@
 [package]
 name = "refstruct"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["David Henningsson <diwic@ubuntu.com>"]
 
-description = "Generates a struct which can rerefence its own fields. Currently alpha/experimental."
+description = "Generates code for structs which can rerefence their own fields. Currently alpha/experimental."
 repository = "https://github.com/diwic/refstruct-rs"
 documentation = "https://github.com/diwic/refstruct-rs/blob/master/README.md"
 keywords = ["struct", "self", "reference"]
