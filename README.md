@@ -1,9 +1,9 @@
 Rust structs that can reference their own fields.
 ===========
 
-Current state: Alpha / experimental.
+Current state: Alpha / experimental, but should be safe and usable - at least no one has proven it to be unsafe, and I'm looking for feedback w r t improving usability.
 
-This file is currently the only documentation.
+This file is currently the only documentation, but should contain enough to get you started.
 
 Background
 -----------
@@ -101,7 +101,7 @@ fields = [
 "#));
 ```
 
-Notice the unnamed lifetime `'_` - this indicates that the lifetime of an earlier field.
+Notice the unnamed lifetime `'_` - this represents the lifetime of an earlier field.
 
 Using the generated code
 ------------------------
